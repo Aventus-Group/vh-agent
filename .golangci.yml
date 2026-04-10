@@ -1,5 +1,6 @@
 run:
   timeout: 5m
+  go: "1.24"
 
 linters:
   enable:
@@ -14,11 +15,15 @@ linters:
     - unconvert
     - unparam
     - gosec
+    - goimports
+    - exhaustive
 
 linters-settings:
   gosec:
     excludes:
       - G204  # subprocess audited — we intentionally run systemctl and wg
+  goimports:
+    local-prefixes: github.com/Aventus-Group/vh-agent
 
 issues:
   exclude-rules:
@@ -26,3 +31,6 @@ issues:
       linters:
         - gosec
         - errcheck
+    - path: internal/pb/
+      linters:
+        - all

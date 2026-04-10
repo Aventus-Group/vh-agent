@@ -3,6 +3,9 @@
 /vh-agent-*
 bin/
 
+# Proto generated
+internal/pb/
+
 # Test coverage
 coverage.out
 coverage.html
@@ -14,3 +17,9 @@ coverage.html
 
 # OS
 .DS_Store
+
+# Secrets / local env
+*.env
+.env*
+*.token
+*.key
