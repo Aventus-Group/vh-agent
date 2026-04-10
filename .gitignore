@@ -1,6 +1,6 @@
 # Binaries
-vh-agent
-vh-agent-*
+/vh-agent
+/vh-agent-*
 bin/
 
 # Test coverage
