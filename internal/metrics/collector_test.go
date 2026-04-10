@@ -60,3 +60,49 @@ func TestCPUPctFromDelta_NoChange(t *testing.T) {
 		t.Errorf("pct = %f, want 0", pct)
 	}
 }
+
+func TestParseLoadAvg(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "proc_loadavg"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	load, err := parseLoadAvg(data)
+	if err != nil {
+		t.Fatalf("parseLoadAvg: %v", err)
+	}
+	if load < 0.14 || load > 0.16 {
+		t.Errorf("load = %f, want ~0.15", load)
+	}
+}
+
+func TestParseWGShow(t *testing.T) {
+	data, err := os.ReadFile(filepath.Join("testdata", "wg_show_output"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	wg, err := parseWGShow(string(data))
+	if err != nil {
+		t.Fatalf("parseWGShow: %v", err)
+	}
+	if wg.Endpoint != "78.47.77.236:48720" {
+		t.Errorf("Endpoint = %q", wg.Endpoint)
+	}
+	if wg.HandshakeAgeSec != 45 {
+		t.Errorf("HandshakeAgeSec = %d, want 45", wg.HandshakeAgeSec)
+	}
+}
+
+func TestParseWGShow_NeverHandshaked(t *testing.T) {
+	input := `interface: vhnet0
+peer: abc=
+  endpoint: 1.2.3.4:48720
+  latest handshake: (none)
+`
+	wg, err := parseWGShow(input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if wg.HandshakeAgeSec != -1 {
+		t.Errorf("HandshakeAgeSec = %d, want -1 (sentinel for never)", wg.HandshakeAgeSec)
+	}
+}

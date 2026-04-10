@@ -92,3 +92,82 @@ func cpuPctFromDelta(prev, curr cpuStat) float64 {
 	nonIdle := totalDelta - idleDelta
 	return float64(nonIdle) * 100.0 / float64(totalDelta)
 }
+
+// parseLoadAvg parses /proc/loadavg and returns the 1-minute average.
+func parseLoadAvg(data []byte) (float64, error) {
+	fields := strings.Fields(string(data))
+	if len(fields) < 1 {
+		return 0, fmt.Errorf("empty loadavg")
+	}
+	return strconv.ParseFloat(fields[0], 64)
+}
+
+// wgStatus holds parsed fields from `wg show vhnet0` output.
+type wgStatus struct {
+	Endpoint        string
+	HandshakeAgeSec int64 // -1 if never handshaked
+}
+
+// parseWGShow parses the output of `wg show vhnet0`.
+// Extracts the first peer's endpoint and latest handshake age.
+func parseWGShow(output string) (*wgStatus, error) {
+	status := &wgStatus{HandshakeAgeSec: -1}
+	lines := strings.Split(output, "\n")
+	inPeer := false
+	for _, raw := range lines {
+		line := strings.TrimSpace(raw)
+		if strings.HasPrefix(line, "peer:") {
+			inPeer = true
+			continue
+		}
+		if !inPeer {
+			continue
+		}
+		if strings.HasPrefix(line, "endpoint:") {
+			status.Endpoint = strings.TrimSpace(strings.TrimPrefix(line, "endpoint:"))
+		}
+		if strings.HasPrefix(line, "latest handshake:") {
+			value := strings.TrimSpace(strings.TrimPrefix(line, "latest handshake:"))
+			if value == "(none)" || value == "" {
+				status.HandshakeAgeSec = -1
+				continue
+			}
+			// Parse "45 seconds ago" / "2 minutes, 30 seconds ago" / "1 hour ago"
+			age, err := parseHandshakeAge(value)
+			if err == nil {
+				status.HandshakeAgeSec = age
+			}
+		}
+	}
+	return status, nil
+}
+
+// parseHandshakeAge converts "2 minutes, 30 seconds ago" → 150.
+func parseHandshakeAge(s string) (int64, error) {
+	s = strings.TrimSuffix(s, " ago")
+	parts := strings.Split(s, ",")
+	var total int64
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		fields := strings.Fields(p)
+		if len(fields) < 2 {
+			continue
+		}
+		n, err := strconv.ParseInt(fields[0], 10, 64)
+		if err != nil {
+			return 0, err
+		}
+		unit := strings.TrimSuffix(fields[1], "s")
+		switch unit {
+		case "second":
+			total += n
+		case "minute":
+			total += n * 60
+		case "hour":
+			total += n * 3600
+		case "day":
+			total += n * 86400
+		}
+	}
+	return total, nil
+}

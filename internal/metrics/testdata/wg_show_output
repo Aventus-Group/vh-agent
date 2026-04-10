@@ -1,0 +1,11 @@
+interface: vhnet0
+  public key: xK8abc=
+  private key: (hidden)
+  listening port: 51820
+
+peer: router-pubkey=
+  endpoint: 78.47.77.236:48720
+  allowed ips: 0.0.0.0/0
+  latest handshake: 45 seconds ago
+  transfer: 1.23 MiB received, 456 KiB sent
+  persistent keepalive: every 25 seconds
