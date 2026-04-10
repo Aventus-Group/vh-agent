@@ -1,85 +1,36 @@
 # vh-agent
 
-Resident Go daemon deployed inside every VibHost LXC container.
-Communicates with `vh-provisioner-service` over gRPC (mTLS) to report health,
-receive configuration updates, and stream real-time deploy logs.
-
-**Phase 1 MVP — gRPC v2 scaffold** (branch `feature/grpc-v2-scaffold`).
-
----
+Resident gRPC daemon that runs inside every VibHost LXC container. Provides exec/file operations for remote deployments initiated by `vh-ai-agent` (Claude-driven deploy orchestrator), with live stdout/stderr streaming via gRPC bidi streams.
 
 ## Architecture
 
-```
-LXC container
-└── vh-agent  (this binary)
-      ├── gRPC client  →  vh-provisioner AgentService
-      │     ├── Heartbeat (unary, every N sec)
-      │     ├── StreamLogs (server-streaming)
-      │     └── GetConfig (unary)
-      └── systemd unit  vibhost-agent.service
-```
+See [design spec](https://github.com/Aventus-Group/vh-provisioner-service/blob/main/docs/superpowers/specs/2026-04-10-vh-agent-v2-grpc-design.md) for the full rationale and API contract.
 
-Transport: gRPC over WireGuard (`vhnet0`) private network `10.10.0.0/16`.
-Auth: mTLS — provisioner CA signs both server cert and per-container client cert.
-
----
+Phase 1 scope: exec, file (read/write/list), kill, health.
+Phase 2 scope (not yet implemented): heartbeat, metrics, wg hot-patch, self-update.
 
 ## Build
 
 ```bash
-make proto   # generate Go from .proto (requires protoc + plugins)
-make build   # cross-compile Linux amd64 static binary → ./vh-agent
+make build       # produces ./vh-agent-linux-amd64
+make test        # runs unit tests with -race
+make lint        # golangci-lint
+make proto-gen   # regenerate gen/agentpb/ from proto/agent.proto
 ```
 
-Requires Go 1.24+.
-
----
-
-## Test
+## Run
 
 ```bash
-make test    # go test ./... -race -cover
-make lint    # golangci-lint run
-make vet     # go vet ./...
+# config lives at /etc/vibhost/agent.conf
+# example contents:
+#   GRPC_LISTEN_ADDR=10.10.75.42:50051
+#   WORKDIR_DEFAULT=/home/appuser
+#   LOG_LEVEL=info
+sudo /usr/local/bin/vh-agent
 ```
 
----
+Under systemd, see `systemd/vibhost-agent.service`.
 
-## Configuration
+## License
 
-The agent reads `/etc/vibhost/agent.conf` (env-file format) and `/etc/vibhost/agent.token`.
-
-| Key            | Description                          |
-|----------------|--------------------------------------|
-| `CONTAINER_ID` | Unique container identifier          |
-| `PROVISIONER_GRPC_ADDR` | `host:port` of AgentService gRPC endpoint |
-| `CA_CERT`      | Path to provisioner CA certificate   |
-| `CLIENT_CERT`  | Path to container client certificate |
-| `CLIENT_KEY`   | Path to container client private key |
-
----
-
-## Directory layout
-
-```
-vh-agent/
-├── cmd/vh-agent/       main entry point
-├── internal/
-│   ├── config/         config loading (env-file + flags)
-│   ├── agent/          gRPC client loop, heartbeat, log streaming
-│   ├── metrics/        CPU / mem / disk / WireGuard collectors
-│   └── pb/             generated protobuf (git-ignored, produced by make proto)
-├── proto/
-│   └── agent/v2/       agent.proto definition
-├── systemd/            vibhost-agent.service unit
-└── .github/workflows/  CI + release pipelines
-```
-
----
-
-## Status
-
-v1 (HTTP polling) lives on `main`.
-This branch (`feature/grpc-v2-scaffold`) is the Phase 1 MVP of the gRPC v2 rewrite.
-See design doc: `vh-provisioner-service/docs/superpowers/specs/2026-04-10-vh-agent-design.md`.
+Internal — Aventus Group.

@@ -3,27 +3,23 @@ run:
   go: "1.24"
 
 linters:
+  disable-all: true
   enable:
     - errcheck
-    - gosimple
+    - gofmt
+    - goimports
+    - gosec
     - govet
     - ineffassign
+    - misspell
+    - revive
     - staticcheck
     - unused
-    - gofmt
-    - misspell
-    - unconvert
-    - unparam
-    - gosec
-    - goimports
-    - exhaustive
 
 linters-settings:
   gosec:
     excludes:
-      - G204  # subprocess audited — we intentionally run systemctl and wg
-  goimports:
-    local-prefixes: github.com/Aventus-Group/vh-agent
+      - G204  # Subprocess launched with variable — vh-agent's whole purpose is running user-provided commands
 
 issues:
   exclude-rules:
@@ -31,6 +27,3 @@ issues:
       linters:
         - gosec
         - errcheck
-    - path: internal/pb/
-      linters:
-        - all

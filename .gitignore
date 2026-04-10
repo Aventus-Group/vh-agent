@@ -1,14 +1,12 @@
 # Binaries
 /vh-agent
-/vh-agent-*
-bin/
+/vh-agent-linux-amd64
+/dist/
 
-# Proto generated
-internal/pb/
-
-# Test coverage
+# Test artifacts
 coverage.out
 coverage.html
+*.test
 
 # IDE
 .idea/
@@ -17,9 +15,3 @@ coverage.html
 
 # OS
 .DS_Store
-
-# Secrets / local env
-*.env
-.env*
-*.token
-*.key
