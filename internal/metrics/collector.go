@@ -4,8 +4,11 @@ import (
 	"bufio"
 	"bytes"
 	"fmt"
+	"os"
+	"os/exec"
 	"strconv"
 	"strings"
+	"syscall"
 )
 
 // memInfo holds parsed /proc/meminfo values in MB.
@@ -170,4 +173,122 @@ func parseHandshakeAge(s string) (int64, error) {
 		}
 	}
 	return total, nil
+}
+
+// Snapshot is the result of one metrics collection cycle.
+type Snapshot struct {
+	CPUPct            float64
+	MemUsedMB         uint64
+	MemTotalMB        uint64
+	DiskUsedGB        float64
+	DiskTotalGB       float64
+	Load1m            float64
+	WGHandshakeAgeSec int64
+	WGEndpoint        string
+}
+
+// Collector reads system metrics. Paths are injectable for tests.
+type Collector struct {
+	StatPath    string
+	MemInfoPath string
+	LoadAvgPath string
+	DiskPath    string
+	WGRunner    func() (string, error) // returns output of `wg show vhnet0`
+
+	prevCPU *cpuStat
+}
+
+// DefaultCollector returns a Collector wired to real /proc and wg show.
+func DefaultCollector() *Collector {
+	return &Collector{
+		StatPath:    "/proc/stat",
+		MemInfoPath: "/proc/meminfo",
+		LoadAvgPath: "/proc/loadavg",
+		DiskPath:    "/",
+		WGRunner:    runWGShow,
+	}
+}
+
+// Collect reads all metrics in one pass.
+func (c *Collector) Collect() (*Snapshot, error) {
+	snap := &Snapshot{}
+
+	// CPU
+	statBytes, err := os.ReadFile(c.StatPath)
+	if err != nil {
+		return nil, fmt.Errorf("read stat: %w", err)
+	}
+	curr, err := parseCPUStat(statBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse stat: %w", err)
+	}
+	if c.prevCPU != nil {
+		snap.CPUPct = cpuPctFromDelta(*c.prevCPU, curr)
+	}
+	c.prevCPU = &curr
+
+	// Memory
+	memBytes, err := os.ReadFile(c.MemInfoPath)
+	if err != nil {
+		return nil, fmt.Errorf("read meminfo: %w", err)
+	}
+	mem, err := parseMemInfo(memBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse meminfo: %w", err)
+	}
+	snap.MemTotalMB = mem.TotalMB
+	snap.MemUsedMB = mem.UsedMB
+
+	// Loadavg
+	loadBytes, err := os.ReadFile(c.LoadAvgPath)
+	if err != nil {
+		return nil, fmt.Errorf("read loadavg: %w", err)
+	}
+	load, err := parseLoadAvg(loadBytes)
+	if err != nil {
+		return nil, fmt.Errorf("parse loadavg: %w", err)
+	}
+	snap.Load1m = load
+
+	// Disk
+	var stat syscall.Statfs_t
+	if err := syscall.Statfs(c.DiskPath, &stat); err != nil {
+		return nil, fmt.Errorf("statfs %s: %w", c.DiskPath, err)
+	}
+	totalBytes := stat.Blocks * uint64(stat.Bsize)
+	freeBytes := stat.Bavail * uint64(stat.Bsize)
+	usedBytes := totalBytes - freeBytes
+	const gb = 1024 * 1024 * 1024
+	snap.DiskTotalGB = float64(totalBytes) / gb
+	snap.DiskUsedGB = float64(usedBytes) / gb
+
+	// WG
+	if c.WGRunner != nil {
+		out, err := c.WGRunner()
+		if err == nil {
+			wg, err := parseWGShow(out)
+			if err == nil {
+				snap.WGEndpoint = wg.Endpoint
+				snap.WGHandshakeAgeSec = wg.HandshakeAgeSec
+			}
+		}
+	}
+
+	return snap, nil
+}
+
+// execCommand is a var so tests can override it.
+var execCommand = func(name string, args ...string) (string, error) {
+	cmd := exec.Command(name, args...)
+	out, err := cmd.CombinedOutput()
+	return string(out), err
+}
+
+// runWGShow executes `wg show vhnet0` and returns its stdout.
+func runWGShow() (string, error) {
+	out, err := execCommand("wg", "show", "vhnet0")
+	if err != nil {
+		return "", fmt.Errorf("wg show: %w (output: %s)", err, out)
+	}
+	return out, nil
 }

@@ -106,3 +106,35 @@ peer: abc=
 		t.Errorf("HandshakeAgeSec = %d, want -1 (sentinel for never)", wg.HandshakeAgeSec)
 	}
 }
+
+func TestCollector_Collect(t *testing.T) {
+	// Use testdata fixtures — Collector accepts injectable file readers for testing.
+	c := &Collector{
+		StatPath:    filepath.Join("testdata", "proc_stat"),
+		MemInfoPath: filepath.Join("testdata", "proc_meminfo"),
+		LoadAvgPath: filepath.Join("testdata", "proc_loadavg"),
+		DiskPath:    "/", // real root — just verifies Statfs works without error
+		WGRunner: func() (string, error) {
+			data, err := os.ReadFile(filepath.Join("testdata", "wg_show_output"))
+			return string(data), err
+		},
+	}
+
+	// First Collect: CPU snapshot is stored, CPU% is 0 (no prior sample).
+	snap1, err := c.Collect()
+	if err != nil {
+		t.Fatalf("Collect: %v", err)
+	}
+	if snap1.MemTotalMB != 1024 {
+		t.Errorf("MemTotalMB = %d", snap1.MemTotalMB)
+	}
+	if snap1.MemUsedMB != 512 {
+		t.Errorf("MemUsedMB = %d", snap1.MemUsedMB)
+	}
+	if snap1.WGEndpoint != "78.47.77.236:48720" {
+		t.Errorf("WGEndpoint = %q", snap1.WGEndpoint)
+	}
+	if snap1.DiskTotalGB <= 0 {
+		t.Errorf("DiskTotalGB = %f, want > 0", snap1.DiskTotalGB)
+	}
+}
