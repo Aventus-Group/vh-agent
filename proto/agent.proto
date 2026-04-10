@@ -1,0 +1,115 @@
+syntax = "proto3";
+
+package vibhost.agent.v1;
+
+option go_package = "github.com/Aventus-Group/vh-agent/gen/agentpb;agentpb";
+
+service VibhostAgent {
+  // Execute a shell command with live stdout/stderr streaming.
+  rpc Exec(ExecRequest) returns (stream ExecEvent);
+
+  // Kill a running command by client-assigned job_id.
+  rpc Kill(KillRequest) returns (KillResponse);
+
+  // Read a file from the container filesystem.
+  rpc ReadFile(ReadFileRequest) returns (ReadFileResponse);
+
+  // Write (or overwrite) a file on the container filesystem.
+  rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
+
+  // List a directory, one level deep.
+  rpc ListDir(ListDirRequest) returns (ListDirResponse);
+
+  // Liveness/readiness probe.
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+// ─── Exec ─────────────────────────────────────────────────────────────
+
+message ExecRequest {
+  string cmd = 1;                    // bash -c argument
+  string workdir = 2;                // default /home/appuser when empty
+  map<string, string> env = 3;       // appended to process environ
+  int32 timeout_sec = 4;             // 0 = no server-side timeout
+  string job_id = 5;                 // client-assigned identifier for Kill
+}
+
+message ExecEvent {
+  oneof event {
+    StartedEvent started = 1;
+    bytes stdout_chunk = 2;
+    bytes stderr_chunk = 3;
+    ExitedEvent exited = 4;
+  }
+}
+
+message StartedEvent {
+  int32 pid = 1;
+  int64 started_at_unix_ms = 2;
+}
+
+message ExitedEvent {
+  int32 exit_code = 1;
+  int64 duration_ms = 2;
+  bool timed_out = 3;
+  string error_message = 4;
+}
+
+// ─── Kill ─────────────────────────────────────────────────────────────
+
+message KillRequest {
+  string job_id = 1;
+  int32 signal = 2;                  // default 15 (SIGTERM); 9 for SIGKILL
+}
+
+message KillResponse {
+  bool killed = 1;                   // false when job_id is not found
+}
+
+// ─── File ops ─────────────────────────────────────────────────────────
+
+message ReadFileRequest {
+  string path = 1;
+  int64 max_bytes = 2;               // 0 = default (1 MiB)
+}
+
+message ReadFileResponse {
+  bytes content = 1;
+  int64 size = 2;                    // real file size; may exceed len(content)
+  bool truncated = 3;
+}
+
+message WriteFileRequest {
+  string path = 1;
+  bytes content = 2;
+  int32 mode = 3;                    // 0 = default (0644)
+  bool create_dirs = 4;              // default true
+}
+
+message WriteFileResponse {
+  int64 bytes_written = 1;
+}
+
+message ListDirRequest {
+  string path = 1;
+}
+
+message ListDirResponse {
+  repeated DirEntry entries = 1;
+}
+
+message DirEntry {
+  string name = 1;
+  int64 size = 2;
+  bool is_dir = 3;
+  int32 mode = 4;
+}
+
+// ─── Health ───────────────────────────────────────────────────────────
+
+message HealthRequest {}
+
+message HealthResponse {
+  string version = 1;
+  int64 uptime_sec = 2;
+}
