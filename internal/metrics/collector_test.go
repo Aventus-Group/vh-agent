@@ -80,10 +80,7 @@ func TestParseWGShow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	wg, err := parseWGShow(string(data))
-	if err != nil {
-		t.Fatalf("parseWGShow: %v", err)
-	}
+	wg := parseWGShow(string(data))
 	if wg.Endpoint != "78.47.77.236:48720" {
 		t.Errorf("Endpoint = %q", wg.Endpoint)
 	}
@@ -98,10 +95,7 @@ peer: abc=
   endpoint: 1.2.3.4:48720
   latest handshake: (none)
 `
-	wg, err := parseWGShow(input)
-	if err != nil {
-		t.Fatal(err)
-	}
+	wg := parseWGShow(input)
 	if wg.HandshakeAgeSec != -1 {
 		t.Errorf("HandshakeAgeSec = %d, want -1 (sentinel for never)", wg.HandshakeAgeSec)
 	}

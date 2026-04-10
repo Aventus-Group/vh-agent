@@ -23,8 +23,9 @@ import (
 var Version = "dev"
 
 const (
-	defaultConfPath   = "/etc/vibhost/agent.conf"
-	defaultTokenPath  = "/etc/vibhost/agent.token"
+	defaultConfPath = "/etc/vibhost/agent.conf"
+	// defaultTokenPath is a filesystem path, not a credential itself.
+	defaultTokenPath  = "/etc/vibhost/agent.token" //nolint:gosec // path constant, not a hardcoded secret
 	defaultBinaryPath = "/usr/local/bin/vh-agent"
 	defaultWGConfig   = "/root/.vibhost/wg/vhnet0.conf"
 	defaultInterface  = "vhnet0"

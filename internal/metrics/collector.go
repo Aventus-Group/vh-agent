@@ -113,7 +113,7 @@ type wgStatus struct {
 
 // parseWGShow parses the output of `wg show vhnet0`.
 // Extracts the first peer's endpoint and latest handshake age.
-func parseWGShow(output string) (*wgStatus, error) {
+func parseWGShow(output string) *wgStatus {
 	status := &wgStatus{HandshakeAgeSec: -1}
 	lines := strings.Split(output, "\n")
 	inPeer := false
@@ -142,7 +142,7 @@ func parseWGShow(output string) (*wgStatus, error) {
 			}
 		}
 	}
-	return status, nil
+	return status
 }
 
 // parseHandshakeAge converts "2 minutes, 30 seconds ago" → 150.
@@ -255,8 +255,10 @@ func (c *Collector) Collect() (*Snapshot, error) {
 	if err := syscall.Statfs(c.DiskPath, &stat); err != nil {
 		return nil, fmt.Errorf("statfs %s: %w", c.DiskPath, err)
 	}
-	totalBytes := stat.Blocks * uint64(stat.Bsize)
-	freeBytes := stat.Bavail * uint64(stat.Bsize)
+	// Bsize is filesystem block size; always positive in practice, cast to uint64 is safe.
+	bsize := uint64(stat.Bsize) //nolint:gosec // block size is always non-negative
+	totalBytes := stat.Blocks * bsize
+	freeBytes := stat.Bavail * bsize
 	usedBytes := totalBytes - freeBytes
 	const gb = 1024 * 1024 * 1024
 	snap.DiskTotalGB = float64(totalBytes) / gb
@@ -266,11 +268,9 @@ func (c *Collector) Collect() (*Snapshot, error) {
 	if c.WGRunner != nil {
 		out, err := c.WGRunner()
 		if err == nil {
-			wg, err := parseWGShow(out)
-			if err == nil {
-				snap.WGEndpoint = wg.Endpoint
-				snap.WGHandshakeAgeSec = wg.HandshakeAgeSec
-			}
+			wg := parseWGShow(out)
+			snap.WGEndpoint = wg.Endpoint
+			snap.WGHandshakeAgeSec = wg.HandshakeAgeSec
 		}
 	}
 
