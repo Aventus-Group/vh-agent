@@ -1,0 +1,16 @@
+# Binaries
+vh-agent
+vh-agent-*
+bin/
+
+# Test coverage
+coverage.out
+coverage.html
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
