@@ -1,0 +1,47 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+
+      - name: Test
+        run: go test ./...
+
+      - name: Build
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
+            -ldflags "-s -w -X main.Version=${VERSION}" \
+            -o vh-agent-linux-amd64 \
+            ./cmd/vh-agent/
+          sha256sum vh-agent-linux-amd64 | tee vh-agent-linux-amd64.sha256
+          ls -lh vh-agent-linux-amd64
+
+      - name: Create Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/}
+          gh release create "${VERSION}" \
+            --title "${VERSION}" \
+            --generate-notes \
+            vh-agent-linux-amd64 \
+            vh-agent-linux-amd64.sha256 \
+            systemd/vibhost-agent.service
