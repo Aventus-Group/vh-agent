@@ -3,6 +3,7 @@ module github.com/Aventus-Group/vh-agent
 go 1.24.2
 
 require (
+	github.com/coreos/go-systemd/v22 v22.5.0
 	github.com/rs/zerolog v1.33.0
 	google.golang.org/grpc v1.70.0
 	google.golang.org/protobuf v1.36.0
