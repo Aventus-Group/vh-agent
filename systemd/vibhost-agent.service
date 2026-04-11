@@ -15,7 +15,7 @@ TimeoutStopSec=30
 # Security hardening
 NoNewPrivileges=true
 ProtectSystem=strict
-ProtectHome=read-only
+ProtectHome=no
 ReadWritePaths=/home /tmp /var/log /etc/nginx /etc/ssl /etc/vibhost
 PrivateTmp=false
 ProtectKernelTunables=true
