@@ -19,12 +19,13 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	VibhostAgent_Exec_FullMethodName      = "/vibhost.agent.v1.VibhostAgent/Exec"
-	VibhostAgent_Kill_FullMethodName      = "/vibhost.agent.v1.VibhostAgent/Kill"
-	VibhostAgent_ReadFile_FullMethodName  = "/vibhost.agent.v1.VibhostAgent/ReadFile"
-	VibhostAgent_WriteFile_FullMethodName = "/vibhost.agent.v1.VibhostAgent/WriteFile"
-	VibhostAgent_ListDir_FullMethodName   = "/vibhost.agent.v1.VibhostAgent/ListDir"
-	VibhostAgent_Health_FullMethodName    = "/vibhost.agent.v1.VibhostAgent/Health"
+	VibhostAgent_Exec_FullMethodName           = "/vibhost.agent.v1.VibhostAgent/Exec"
+	VibhostAgent_Kill_FullMethodName           = "/vibhost.agent.v1.VibhostAgent/Kill"
+	VibhostAgent_ReadFile_FullMethodName       = "/vibhost.agent.v1.VibhostAgent/ReadFile"
+	VibhostAgent_WriteFile_FullMethodName      = "/vibhost.agent.v1.VibhostAgent/WriteFile"
+	VibhostAgent_ListDir_FullMethodName        = "/vibhost.agent.v1.VibhostAgent/ListDir"
+	VibhostAgent_Health_FullMethodName         = "/vibhost.agent.v1.VibhostAgent/Health"
+	VibhostAgent_AnalyzeProject_FullMethodName = "/vibhost.agent.v1.VibhostAgent/AnalyzeProject"
 )
 
 // VibhostAgentClient is the client API for VibhostAgent service.
@@ -43,6 +44,9 @@ type VibhostAgentClient interface {
 	ListDir(ctx context.Context, in *ListDirRequest, opts ...grpc.CallOption) (*ListDirResponse, error)
 	// Liveness/readiness probe.
 	Health(ctx context.Context, in *HealthRequest, opts ...grpc.CallOption) (*HealthResponse, error)
+	// Deep project analysis: file tree, stack detection, configs, source analysis.
+	// Returns JSON-encoded ProjectAnalysis (same schema as vibhost-mcp --analyze).
+	AnalyzeProject(ctx context.Context, in *AnalyzeProjectRequest, opts ...grpc.CallOption) (*AnalyzeProjectResponse, error)
 }
 
 type vibhostAgentClient struct {
@@ -122,6 +126,16 @@ func (c *vibhostAgentClient) Health(ctx context.Context, in *HealthRequest, opts
 	return out, nil
 }
 
+func (c *vibhostAgentClient) AnalyzeProject(ctx context.Context, in *AnalyzeProjectRequest, opts ...grpc.CallOption) (*AnalyzeProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AnalyzeProjectResponse)
+	err := c.cc.Invoke(ctx, VibhostAgent_AnalyzeProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // VibhostAgentServer is the server API for VibhostAgent service.
 // All implementations must embed UnimplementedVibhostAgentServer
 // for forward compatibility.
@@ -138,6 +152,9 @@ type VibhostAgentServer interface {
 	ListDir(context.Context, *ListDirRequest) (*ListDirResponse, error)
 	// Liveness/readiness probe.
 	Health(context.Context, *HealthRequest) (*HealthResponse, error)
+	// Deep project analysis: file tree, stack detection, configs, source analysis.
+	// Returns JSON-encoded ProjectAnalysis (same schema as vibhost-mcp --analyze).
+	AnalyzeProject(context.Context, *AnalyzeProjectRequest) (*AnalyzeProjectResponse, error)
 	mustEmbedUnimplementedVibhostAgentServer()
 }
 
@@ -165,6 +182,9 @@ func (UnimplementedVibhostAgentServer) ListDir(context.Context, *ListDirRequest)
 }
 func (UnimplementedVibhostAgentServer) Health(context.Context, *HealthRequest) (*HealthResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Health not implemented")
+}
+func (UnimplementedVibhostAgentServer) AnalyzeProject(context.Context, *AnalyzeProjectRequest) (*AnalyzeProjectResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method AnalyzeProject not implemented")
 }
 func (UnimplementedVibhostAgentServer) mustEmbedUnimplementedVibhostAgentServer() {}
 func (UnimplementedVibhostAgentServer) testEmbeddedByValue()                      {}
@@ -288,6 +308,24 @@ func _VibhostAgent_Health_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _VibhostAgent_AnalyzeProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AnalyzeProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(VibhostAgentServer).AnalyzeProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: VibhostAgent_AnalyzeProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(VibhostAgentServer).AnalyzeProject(ctx, req.(*AnalyzeProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // VibhostAgent_ServiceDesc is the grpc.ServiceDesc for VibhostAgent service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -314,6 +352,10 @@ var VibhostAgent_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Health",
 			Handler:    _VibhostAgent_Health_Handler,
+		},
+		{
+			MethodName: "AnalyzeProject",
+			Handler:    _VibhostAgent_AnalyzeProject_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

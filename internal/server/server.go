@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Aventus-Group/vh-agent/gen/agentpb"
+	"github.com/Aventus-Group/vh-agent/internal/analyzesvc"
 	"github.com/Aventus-Group/vh-agent/internal/execsvc"
 	"github.com/Aventus-Group/vh-agent/internal/fssvc"
 	"github.com/Aventus-Group/vh-agent/internal/healthsvc"
@@ -16,17 +17,19 @@ import (
 // Facade implements agentpb.VibhostAgentServer by delegating to sub-services.
 type Facade struct {
 	agentpb.UnimplementedVibhostAgentServer
-	exec   *execsvc.Service
-	fs     *fssvc.Service
-	health *healthsvc.Service
+	exec    *execsvc.Service
+	fs      *fssvc.Service
+	health  *healthsvc.Service
+	analyze *analyzesvc.Service
 }
 
 // NewFacade constructs a facade ready to be registered on a gRPC server.
 func NewFacade(version, defaultWorkdir string) *Facade {
 	return &Facade{
-		exec:   execsvc.New(jobs.New(), defaultWorkdir),
-		fs:     fssvc.New(),
-		health: healthsvc.New(version, time.Now()),
+		exec:    execsvc.New(jobs.New(), defaultWorkdir),
+		fs:      fssvc.New(),
+		health:  healthsvc.New(version, time.Now()),
+		analyze: analyzesvc.New(),
 	}
 }
 
@@ -58,6 +61,11 @@ func (f *Facade) ListDir(ctx context.Context, req *agentpb.ListDirRequest) (*age
 // Health delegates to the health sub-service.
 func (f *Facade) Health(ctx context.Context, req *agentpb.HealthRequest) (*agentpb.HealthResponse, error) {
 	return f.health.Health(ctx, req)
+}
+
+// AnalyzeProject delegates to the analyze sub-service.
+func (f *Facade) AnalyzeProject(ctx context.Context, req *agentpb.AnalyzeProjectRequest) (*agentpb.AnalyzeProjectResponse, error) {
+	return f.analyze.AnalyzeProject(ctx, req)
 }
 
 // New returns a configured grpc.Server with the facade registered and the

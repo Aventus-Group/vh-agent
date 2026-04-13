@@ -22,6 +22,10 @@ service VibhostAgent {
 
   // Liveness/readiness probe.
   rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Deep project analysis: file tree, stack detection, configs, source analysis.
+  // Returns JSON-encoded ProjectAnalysis (same schema as vibhost-mcp --analyze).
+  rpc AnalyzeProject(AnalyzeProjectRequest) returns (AnalyzeProjectResponse);
 }
 
 // ─── Exec ─────────────────────────────────────────────────────────────
@@ -112,4 +116,14 @@ message HealthRequest {}
 message HealthResponse {
   string version = 1;
   int64 uptime_sec = 2;
+}
+
+// ─── AnalyzeProject ──────────────────────────────────────────────────
+
+message AnalyzeProjectRequest {
+  string path = 1;                     // project root; default /home/appuser
+}
+
+message AnalyzeProjectResponse {
+  bytes analysis_json = 1;             // JSON-encoded ProjectAnalysis
 }
